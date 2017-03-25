@@ -77,7 +77,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
     // ORB extraction
     thread threadLeft(&Frame::ExtractORB,this,0,imLeft);
     thread threadRight(&Frame::ExtractORB,this,1,imRight);
-    threadLeft.join();
+    threadLeft.join(); /// Blocks the current thread until the thread identified by *this finishes its execution
     threadRight.join();
 
     if(mvKeys.empty())
@@ -85,7 +85,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
     N = mvKeys.size();
 
-    UndistortKeyPoints();
+    UndistortKeyPoints(); /// should be ignored if imgs have been rectified already
 
     ComputeStereoMatches();
 
@@ -258,6 +258,11 @@ void Frame::SetPose(cv::Mat Tcw)
     UpdatePoseMatrices();
 }
 
+void Frame::SetPoseCovariance(cv::Mat Cov)
+{
+    pCov = Cov.clone();
+}
+
 void Frame::UpdatePoseMatrices()
 { 
     mRcw = mTcw.rowRange(0,3).colRange(0,3);
@@ -418,6 +423,7 @@ void Frame::UndistortKeyPoints()
     }
 
     // Undistort points
+    /// Yang. TODO: use proper map
     mat=mat.reshape(2);
     cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK);
     mat=mat.reshape(1);

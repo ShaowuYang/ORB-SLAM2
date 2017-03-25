@@ -53,7 +53,7 @@ void MapDrawer::DrawMapPoints()
 
     glPointSize(mPointSize);
     glBegin(GL_POINTS);
-    glColor3f(0.0,0.0,0.0);
+    glColor3f(0.0,0.0,1.0); // yang
 
     for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
     {
@@ -84,7 +84,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 {
     const float &w = mKeyFrameSize;
     const float h = w*0.75;
-    const float z = w*0.6;
+    const float z = 0;//w*0.6; // yang
 
     const vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
 

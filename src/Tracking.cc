@@ -209,6 +209,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     mImGray = imRGB;
     cv::Mat imDepth = imD;
 
+//    cout << "image channels: " << mImGray.channels() << endl;
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -223,12 +224,14 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
         else
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
+//    cout << "image cvted.. " << endl;
 
     if(mDepthMapFactor!=1 || imDepth.type()!=CV_32F);
     imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
+    mbNewKeyframe = false;
     Track();
 
     return mCurrentFrame.mTcw.clone();
@@ -454,8 +457,10 @@ void Tracking::Track()
             mlpTemporalPoints.clear();
 
             // Check if we need to insert a new keyframe
-            if(NeedNewKeyFrame())
+            if(NeedNewKeyFrame()){
+                mbNewKeyframe = true;
                 CreateNewKeyFrame();
+            }
 
             // We allow points with high innovation (considererd outliers by the Huber Function)
             // pass to the new keyframe, so that bundle adjustment will finally decide
@@ -1151,6 +1156,10 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+
+    /// Yang, use current RGBD point cloud to update 3D grid map
+    /// In the future, 3D grid map should be updated along with kf pose refinement
+
 }
 
 void Tracking::SearchLocalPoints()

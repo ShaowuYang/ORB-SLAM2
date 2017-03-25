@@ -71,6 +71,7 @@ ${LIBS}
 # Node for RGB-D camera
 rosbuild_add_executable(RGBD
 src/ros_rgbd.cc
+src/ros_viewer.cpp
 )
 
 target_link_libraries(RGBD

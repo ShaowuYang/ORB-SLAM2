@@ -110,6 +110,9 @@ public:
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
 
+    /// Yang, new keyframe?
+    bool mbNewKeyframe;
+
 private:
 
     // Input sensor

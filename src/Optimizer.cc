@@ -34,6 +34,8 @@
 
 #include<mutex>
 
+#include "Thirdparty/g2o/g2o/core/base_vertex.h" // for hession matrix
+
 namespace ORB_SLAM2
 {
 
@@ -446,6 +448,8 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
     cv::Mat pose = Converter::toCvMat(SE3quat_recov);
     pFrame->SetPose(pose);
+
+//    g2o::HessianBlockType pCov = optimizer.vertex(0)->A();
 
     return nInitialCorrespondences-nBad;
 }

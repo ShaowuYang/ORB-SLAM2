@@ -34,11 +34,11 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
-    cout << endl <<
-    "ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << endl <<
-    "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
-    "This is free software, and you are welcome to redistribute it" << endl <<
-    "under certain conditions. See LICENSE.txt." << endl << endl;
+//    cout << endl <<
+//    "ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << endl <<
+//    "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
+//    "This is free software, and you are welcome to redistribute it" << endl <<
+//    "under certain conditions. See LICENSE.txt." << endl << endl;
 
     cout << "Input sensor was set to: ";
 
@@ -199,7 +199,12 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     }
     }
 
-    return mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+    mbNewKeyframe = false;
+
+    cv::Mat mTcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+    mbNewKeyframe = mpTracker->mbNewKeyframe;
+
+    return mTcw.clone();
 }
 
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)

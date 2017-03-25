@@ -634,7 +634,8 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         tp*=d1-d3;
 
         cv::Mat t = U*tp;
-        vt.push_back(t/cv::norm(t));
+        vt.push_back(t/cv::norm(t));/// Yang, assuming unit transformation
+        /// when we change scale initialization method, modification should also go here
 
         cv::Mat np(3,1,CV_32F);
         np.at<float>(0)=x1[i];

@@ -65,7 +65,8 @@ void LoopClosing::Run()
         if(CheckNewKeyFrames())
         {
             // Detect loop candidates and check covisibility consistency
-            if(DetectLoop())
+            if(DetectLoop()) // yang
+//            if (false)
             {
                // Compute similarity transformation [sR|t]
                // In the stereo/RGBD case s=1
@@ -73,6 +74,7 @@ void LoopClosing::Run()
                {
                    // Perform loop fusion and pose graph optimization
                    CorrectLoop();
+                   std::cout << "Loop detected and corrected in Sim3!" << std::endl;
                }
             }
         }       
@@ -531,7 +533,6 @@ void LoopClosing::CorrectLoop()
                 }
             }
         }
-
     }
 
     // Project MapPoints observed in the neighborhood of the loop keyframe

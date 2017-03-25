@@ -113,6 +113,9 @@ public:
     // True if local mapping is deactivated and we are performing only localization
     bool mbOnlyTracking;
 
+    /// Yang, is this a new keyframe? if so, update 3D grid map
+    bool mbNewKeyframe;
+
     void Reset();
 
 protected:

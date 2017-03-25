@@ -66,6 +66,9 @@ public:
     // Set the camera pose.
     void SetPose(cv::Mat Tcw);
 
+    /// set the camera pose covariance
+    void SetPoseCovariance(cv::Mat Cov);
+
     // Computes rotation, translation and camera center matrices from the camera pose.
     void UpdatePoseMatrices();
 
@@ -162,6 +165,9 @@ public:
 
     // Camera pose.
     cv::Mat mTcw;
+
+    /// Camera pose covariance
+    cv::Mat pCov;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;
