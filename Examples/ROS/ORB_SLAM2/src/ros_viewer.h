@@ -15,13 +15,14 @@ struct rawData{
   cv::Mat im;
   cv::Mat depth;
   cv::Mat mTcw;
+  double timestamp;
 };
 
 class ros_viewer
 {
 public:
   ros_viewer(const std::string &strSettingPath);
-  void addKfToQueue(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat mTcw);
+  void addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw);
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr createPointCloud(const rawData rawimg, int step=1);
 
   // Main function
@@ -45,7 +46,7 @@ private:
   std::vector<rawData> rawImages;
 
   ros::Publisher pub_pointCloud;
-
+  ros::Publisher pub_pointCloudFull;
 };
 
 } // namespace

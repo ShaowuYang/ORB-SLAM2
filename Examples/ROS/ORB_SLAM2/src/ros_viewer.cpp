@@ -13,6 +13,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
 {
   ros::NodeHandle nh_;
   pub_pointCloud = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloud2", 1);
+  pub_pointCloudFull = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudfull2", 1);
 
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
@@ -60,12 +61,13 @@ ros_viewer::ros_viewer(const string &strSettingPath)
 
 }
 
-void ros_viewer::addKfToQueue(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat mTcw)
+void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
 {
   rawData temp;
   temp.im = im.clone();
   temp.depth = depthmap.clone();
   temp.mTcw = mTcw.clone();
+  temp.timestamp = timestamp;
 
   unique_lock<mutex> lock(mMutexROSViewer);
   rawImages.push_back(temp);
@@ -83,26 +85,42 @@ void ros_viewer::Run()
       rawImages.erase(rawImages.begin());
       mMutexROSViewer.unlock();
 
-      if (!pub_pointCloud.getNumSubscribers())
-        return;
-
 //      ros::Time tB = ros::Time::now();
       pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-      cloud = createPointCloud(temp);
+      cloud = createPointCloud(temp,4);
 //      ros::Duration bTcreate = ros::Time::now() - tB;
 //      std::cout << "time cost bTcreate: " << bTcreate.toSec() << std::endl;
 
       // publish point cloud
-      sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2());
-      pcl::toROSMsg(*cloud, *msg);
-      msg->header.frame_id = "world";//
-      msg->header.stamp = ros::Time::now();
+      if (pub_pointCloud.getNumSubscribers()){
+        sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2());
+        pcl::toROSMsg(*cloud, *msg);
+        msg->header.frame_id = "world";//
+        msg->header.stamp = ros::Time(temp.timestamp);
 
-      pub_pointCloud.publish(msg);
+        pub_pointCloud.publish(msg);
+      }
 
-//      ros::Duration bT = ros::Time::now() - tB;
-//      std::cout << "time cost for creating pointcloud: " << bT.toSec() << std::endl;
+      // publish full point cloud
+      // simply ignoring the dynamic changes of pointcloud during SLAM
+      static unsigned int nfullcloud = 0;
+      static pcl::PointCloud<pcl::PointXYZRGB>::Ptr fullCloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+      sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
+      *fullCloud += *cloud;
+
+      if (pub_pointCloudFull.getNumSubscribers()){
+        pcl::toROSMsg(*fullCloud, *msgf);
+        nfullcloud++;
+        msgf->header.frame_id = "world";//
+        msgf->header.stamp = ros::Time(temp.timestamp);
+        pub_pointCloudFull.publish(msgf);
+      }
+
+      //      ros::Duration bT = ros::Time::now() - tB;
+      //      std::cout << "time cost for creating pointcloud: " << bT.toSec() << std::endl;
     }
+
+    // TODO: if a loop is closed, re-create the full point cloud
 
     usleep(3000);
   }
