@@ -14,6 +14,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   ros::NodeHandle nh_;
   pub_pointCloud = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloud2", 1);
   pub_pointCloudFull = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudfull2", 1);
+  pub_pointCloudupdated = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudup2", 1);
 
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
@@ -59,6 +60,8 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   cout << endl << "Camera Parameters read by ros viewer." << endl;
   cv::initUndistortRectifyMap(mK, mDistCoef, cv::Mat(), mK_new, cv::Size(640, 480), CV_32FC1, mMapx, mMapy);
 
+  fullCloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+  mbNeedUpdateKFs = false;
 }
 
 void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
@@ -70,26 +73,62 @@ void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const do
   temp.timestamp = timestamp;
 
   unique_lock<mutex> lock(mMutexROSViewer);
+  rawImages_queue.push_back(temp);
   rawImages.push_back(temp);
-  mMutexROSViewer.unlock();
+}
+
+void ros_viewer::addUpdatedKF(const std::map<double, cv::Mat> kfposes)
+{
+  updatedKFposes = kfposes;
+  mbNeedUpdateKFs = true;
+}
+
+void ros_viewer::updateFullPointCloud()
+{
+  fullCloud = NULL;
+  fullCloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+  for (unsigned int i = 0; i < rawImages.size(); i ++){
+    cout << "image id: " << i << ", pose: " << rawImages[i].mTcw << endl;
+    // update kf poses, check timestamp
+    for(map<double, cv::Mat>::iterator mit=updatedKFposes.begin(), mend=updatedKFposes.end(); mit!=mend; mit++)
+    {
+        double mtime = mit->first;
+        if(rawImages[i].timestamp == mtime){
+          rawImages[i].mTcw = mit->second.clone();
+          updatedKFposes.erase(mit);
+        }
+
+    }
+    // recreate point cloud
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
+    cloud = createPointCloud(rawImages[i],8);
+    *fullCloud += *cloud;
+
+    cout << "updated pose: " << rawImages[i].mTcw << endl;
+  }
+
+  if (pub_pointCloudupdated.getNumSubscribers()){
+    sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
+    pcl::toROSMsg(*fullCloud, *msgf);
+    msgf->header.frame_id = "world";//
+    msgf->header.stamp = ros::Time(rawImages[rawImages.size()-1].timestamp);
+    pub_pointCloudupdated.publish(msgf);
+  }
 }
 
 void ros_viewer::Run()
 {
   ros::NodeHandle nh;
   while(nh.ok()){
-    if (rawImages.size()){
-      rawData temp = rawImages[0];
+    while(rawImages_queue.size()){
+      rawData temp = rawImages_queue[0];
 
       unique_lock<mutex> lock(mMutexROSViewer);
-      rawImages.erase(rawImages.begin());
-      mMutexROSViewer.unlock();
+      rawImages_queue.erase(rawImages_queue.begin());
+      lock.unlock();
 
-//      ros::Time tB = ros::Time::now();
       pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-      cloud = createPointCloud(temp,4);
-//      ros::Duration bTcreate = ros::Time::now() - tB;
-//      std::cout << "time cost bTcreate: " << bTcreate.toSec() << std::endl;
+      cloud = createPointCloud(temp,8);
 
       // publish point cloud
       if (pub_pointCloud.getNumSubscribers()){
@@ -104,23 +143,23 @@ void ros_viewer::Run()
       // publish full point cloud
       // simply ignoring the dynamic changes of pointcloud during SLAM
       static unsigned int nfullcloud = 0;
-      static pcl::PointCloud<pcl::PointXYZRGB>::Ptr fullCloud(new pcl::PointCloud<pcl::PointXYZRGB>());
-      sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
       *fullCloud += *cloud;
 
       if (pub_pointCloudFull.getNumSubscribers()){
+        sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
         pcl::toROSMsg(*fullCloud, *msgf);
         nfullcloud++;
         msgf->header.frame_id = "world";//
         msgf->header.stamp = ros::Time(temp.timestamp);
         pub_pointCloudFull.publish(msgf);
       }
-
-      //      ros::Duration bT = ros::Time::now() - tB;
-      //      std::cout << "time cost for creating pointcloud: " << bT.toSec() << std::endl;
     }
 
-    // TODO: if a loop is closed, re-create the full point cloud
+    // if a loop is closed, re-create the full point cloud
+    if (mbNeedUpdateKFs){
+      updateFullPointCloud();
+      mbNeedUpdateKFs = false;
+    }
 
     usleep(3000);
   }

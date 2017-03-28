@@ -207,6 +207,28 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return mTcw.clone();
 }
 
+std::map<double, cv::Mat> System::getUpdatedKFposes()
+{
+  std::map<double, cv::Mat> kfposes;
+
+  unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+  std::vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+  for(size_t i=0; i<vpKFs.size(); i++)
+  {
+      KeyFrame* pKF = vpKFs[i];
+      // TODO: set kf ID to ensure consistancy. currently using timestamp
+      cv::Mat pose = pKF->GetPose();
+      kfposes[pKF->mTimeStamp] = pose.clone();
+  }
+
+  return kfposes;
+}
+
+bool System::isLoopCorrected()
+{
+  return mpLoopCloser->isLoopCorrected();
+}
+
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)

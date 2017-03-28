@@ -80,6 +80,15 @@ public:
 
     bool isFinished();
 
+    bool isLoopCorrected(){
+      if (mbLoopCorrected){
+        mbLoopCorrected = false;
+        return true;
+      }
+      else
+        return false;
+    }
+
 protected:
 
     bool CheckNewKeyFrames();
@@ -139,6 +148,9 @@ protected:
 
     // Fix scale in the stereo/RGB-D case
     bool mbFixScale;
+
+    // Yang, signal for update 3D grid map
+    bool mbLoopCorrected;
 };
 
 } //namespace ORB_SLAM

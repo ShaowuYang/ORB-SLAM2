@@ -42,6 +42,8 @@ LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, 
 {
     mnCovisibilityConsistencyTh = 3;
     mpMatchedKF = NULL;
+
+    mbLoopCorrected = false;
 }
 
 void LoopClosing::SetTracker(Tracking *pTracker)
@@ -65,8 +67,8 @@ void LoopClosing::Run()
         if(CheckNewKeyFrames())
         {
             // Detect loop candidates and check covisibility consistency
-            if(DetectLoop()) // yang
-//            if (false)
+            if(DetectLoop())
+//            if (false) // yang
             {
                // Compute similarity transformation [sR|t]
                // In the stereo/RGBD case s=1
@@ -408,7 +410,7 @@ void LoopClosing::CorrectLoop()
 
     // Send a stop signal to Local Mapping
     // Avoid new keyframes are inserted while correcting the loop
-    mpLocalMapper->RequestStop();
+    mpLocalMapper->RequestStop(); /// Yang, signal to user
 
     // If a Global Bundle Adjustment is running, abort it
     if(isRunningGBA())
@@ -740,6 +742,9 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
         mbFinishedGBA = true;
         mbRunningGBA = false;
+
+        // Yang, signal be sent to update 3D grid map
+        mbLoopCorrected = true;
     }
 }
 

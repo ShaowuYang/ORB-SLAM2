@@ -23,6 +23,8 @@ class ros_viewer
 public:
   ros_viewer(const std::string &strSettingPath);
   void addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw);
+  void addUpdatedKF(const std::map<double, cv::Mat> kfposes);
+  void updateFullPointCloud();
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr createPointCloud(const rawData rawimg, int step=1);
 
   // Main function
@@ -43,10 +45,17 @@ private:
   cv::Mat mMapy;
   cv::Mat mK_new;
 
-  std::vector<rawData> rawImages;
+  std::vector<rawData> rawImages_queue; // temp raw images
+  std::vector<rawData> rawImages; //global raw images to be used when a loop is closed
 
   ros::Publisher pub_pointCloud;
   ros::Publisher pub_pointCloudFull;
+  ros::Publisher pub_pointCloudupdated;
+
+  std::map<double, cv::Mat> updatedKFposes;
+  bool mbNeedUpdateKFs;
+
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr fullCloud;
 };
 
 } // namespace

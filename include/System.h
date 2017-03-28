@@ -112,6 +112,8 @@ public:
 
     /// Yang, new keyframe?
     bool mbNewKeyframe;
+    std::map<double, cv::Mat> getUpdatedKFposes(); // kf poses after loop closing
+    bool isLoopCorrected();
 
 private:
 
@@ -159,6 +161,7 @@ private:
     std::mutex mMutexMode;
     bool mbActivateLocalizationMode;
     bool mbDeactivateLocalizationMode;
+
 };
 
 }// namespace ORB_SLAM

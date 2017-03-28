@@ -155,9 +155,14 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
     mTcw = mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
     pub_camera(mTcw);
 
-    /// update 3D grid map, implemented in ros_viewer
+    /// update 3D grid map, implemented in ros_viewer. The first kf is not considered
     if (mpSLAM->mbNewKeyframe){
-        ros_view->addKfToQueue(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec(), coordinateTransform(mTcw));
+      ros_view->addKfToQueue(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec(), coordinateTransform(mTcw));
+    }
+    // if loop is closed
+    if (mpSLAM->isLoopCorrected()){
+      const std::map<double, cv::Mat> kfposes = mpSLAM->getUpdatedKFposes();
+      ros_view->addUpdatedKF(kfposes);
     }
 }
 
