@@ -88,14 +88,15 @@ void ros_viewer::updateFullPointCloud()
   fullCloud = NULL;
   fullCloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
   for (unsigned int i = 0; i < rawImages.size(); i ++){
-    cout << "image id: " << i << ", pose: " << rawImages[i].mTcw << endl;
+//    cout << "image id: " << i << ", pose: " << rawImages[i].mTcw << endl;
     // update kf poses, check timestamp
     for(map<double, cv::Mat>::iterator mit=updatedKFposes.begin(), mend=updatedKFposes.end(); mit!=mend; mit++)
     {
         double mtime = mit->first;
         if(rawImages[i].timestamp == mtime){
           rawImages[i].mTcw = mit->second.clone();
-          updatedKFposes.erase(mit);
+          // TODO: record the iterator, and erase it afterwards.
+//          updatedKFposes.erase(mit);
         }
 
     }
@@ -104,7 +105,7 @@ void ros_viewer::updateFullPointCloud()
     cloud = createPointCloud(rawImages[i],8);
     *fullCloud += *cloud;
 
-    cout << "updated pose: " << rawImages[i].mTcw << endl;
+//    cout << "updated pose: " << rawImages[i].mTcw << endl;
   }
 
   if (pub_pointCloudupdated.getNumSubscribers()){
