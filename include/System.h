@@ -115,6 +115,9 @@ public:
     std::map<double, cv::Mat> getUpdatedKFposes(); // kf poses after loop closing
     bool isLoopCorrected();
 
+    bool mbTrackInit; // tracking initialized? if so, attitude from IMU not used
+    void getIMUatt(double roll, double pitch);
+
 private:
 
     // Input sensor

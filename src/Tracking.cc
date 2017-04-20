@@ -146,6 +146,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
 
+    mbIMUattitude = false;
+
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -265,6 +267,13 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
     Track();
 
     return mCurrentFrame.mTcw.clone();
+}
+
+void Tracking::getIMUatt(double roll, double pitch)
+{
+  imuRoll = roll;
+  imuPitch= pitch;
+  mbIMUattitude = true;
 }
 
 void Tracking::Track()
@@ -516,7 +525,13 @@ void Tracking::StereoInitialization()
     if(mCurrentFrame.N>500)
     {
         // Set Frame pose to the origin
+      if (!mbIMUattitude)
         mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
+      else
+      {
+        /// TODO: use imu attitude to set pose
+        mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
+      }
 
         // Create KeyFrame
         KeyFrame* pKFini = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);

@@ -35,17 +35,22 @@
 
 #include "../../../include/System.h"
 #include "ros_viewer.h"
+#include <sensor_msgs/Imu.h>
+#include "bullet/LinearMath/btTransform.h"
+
 
 using namespace std;
 
 class ImageGrabber
 {
-public:
+  public:
     ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD);
 
     void pub_camera(const cv::Mat mTcw);
+
+    void attitudeCallback(const sensor_msgs::ImuConstPtr& msg);
 
     ORB_SLAM2::System* mpSLAM;
 };
@@ -54,6 +59,15 @@ public:
 My_Viewer::ros_viewer* ros_view;
 std::thread* mptViewer;
 tf::TransformBroadcaster* tfb_;
+bool isattitudecall;
+bool isTrackInid;
+boost::mutex mAttitudelock;
+sensor_msgs::Imu attitude_data_org;
+struct myAttitude{
+    double roll;
+    double pitch;
+    double yaw;
+} attitude_data_;
 
 // the world coordinates in ORB-SLAM was set to be the first frame coordinates
 cv::Mat coordinateTransform(cv::Mat mTcw)
@@ -84,10 +98,10 @@ int main(int argc, char **argv)
 
     if(argc != 3)
     {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" << endl;        
+        cerr << endl << "Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" << endl;
         ros::shutdown();
         return 1;
-    }    
+    }
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
@@ -103,6 +117,10 @@ int main(int argc, char **argv)
     tfb_ = new tf::TransformBroadcaster();
 
     // TODO: use ros launch file to config. Now, adjust topics to be subscribed mannually
+    isattitudecall = false;
+    ros::Subscriber sub_attitude_ = nh.subscribe<sensor_msgs::Imu>("/imu/data", 1, boost::bind(&ImageGrabber::attitudeCallback, &igb, _1));
+    isTrackInid = false;
+
 //    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_color", 1);//image_raw, image_color
 //    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth_registered/image_raw", 1);//_registered
     message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);//image_raw, image_color
@@ -124,8 +142,53 @@ int main(int argc, char **argv)
     return 0;
 }
 
+void ImageGrabber::attitudeCallback(const sensor_msgs::ImuConstPtr& msg)
+{
+    isattitudecall = true;
+
+    mAttitudelock.lock();
+    attitude_data_org.header.stamp = ros::Time::now();
+    attitude_data_org.orientation = msg->orientation;
+    attitude_data_org.angular_velocity = msg->angular_velocity;
+
+    // assemble my imu data's desired data type
+    btTransform trans(btQuaternion(attitude_data_org.orientation.x,
+                                   attitude_data_org.orientation.y,
+                                   attitude_data_org.orientation.z,
+                                   attitude_data_org.orientation.w),
+                      btVector3(1,
+                                1,
+                                1));
+
+
+    btMatrix3x3 rot;
+    // xsens use a ENU world coords
+    rot.setValue(1, 0, 0,
+                 0,-1, 0,
+                 0, 0, -1);
+    btMatrix3x3 R(trans.getRotation());
+    R = R*rot;
+    btScalar roll1, pitch1, yaw1;
+    R.getEulerYPR(yaw1, pitch1, roll1);
+
+    attitude_data_.roll = roll1;
+    attitude_data_.pitch = pitch1;
+    attitude_data_.yaw = 0.0;
+
+    mAttitudelock.unlock();
+
+}
+
 void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD)
 {
+  // fetch the attitude data for initialization
+  if (!isTrackInid && isattitudecall){
+    mAttitudelock.lock();
+    // send attitude data to tracking
+    mpSLAM->getIMUatt(attitude_data_.roll, attitude_data_.pitch);
+    mAttitudelock.unlock();
+  }
+
     // Copy the ros image message to cv::Mat.
 //    cv_bridge::CvImageConstPtr cv_ptrRGB;
     cv_bridge::CvImagePtr cv_ptrRGB;
@@ -156,6 +219,7 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
 //    cv::waitKey(100);
     cv::Mat mTcw(4,4,CV_32F);
     mTcw = mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
+    isTrackInid = mpSLAM->mbTrackInit;
     pub_camera(mTcw);
 
     /// update 3D grid map, implemented in ros_viewer. The first kf is not considered

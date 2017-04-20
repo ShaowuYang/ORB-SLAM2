@@ -204,7 +204,14 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     cv::Mat mTcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
     mbNewKeyframe = mpTracker->mbNewKeyframe;
 
+    mbTrackInit = (mpTracker->mState==Tracking::NOT_INITIALIZED)?false:true;
+
     return mTcw.clone();
+}
+
+void System::getIMUatt(double roll, double pitch)
+{
+  mpTracker->getIMUatt(roll, pitch);
 }
 
 std::map<double, cv::Mat> System::getUpdatedKFposes()

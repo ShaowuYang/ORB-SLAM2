@@ -118,6 +118,8 @@ public:
 
     void Reset();
 
+    void getIMUatt(double roll, double pitch);
+
 protected:
 
     // Main tracking function. It is independent of the input sensor.
@@ -217,6 +219,10 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+
+    /// IMU attitude
+    double imuRoll, imuPitch;
+    bool mbIMUattitude; // if true, use imu att to initialize the world frame
 };
 
 } //namespace ORB_SLAM
