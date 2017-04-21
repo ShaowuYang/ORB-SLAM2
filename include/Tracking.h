@@ -118,7 +118,7 @@ public:
 
     void Reset();
 
-    void getIMUatt(double roll, double pitch);
+    void getIMUatt(cv::Mat att);
 
 protected:
 
@@ -221,7 +221,7 @@ protected:
     list<MapPoint*> mlpTemporalPoints;
 
     /// IMU attitude
-    double imuRoll, imuPitch;
+    cv::Mat imuAtt;
     bool mbIMUattitude; // if true, use imu att to initialize the world frame
     cv::Mat getIniPose();
 };

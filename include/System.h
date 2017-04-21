@@ -116,7 +116,7 @@ public:
     bool isLoopCorrected();
 
     bool mbTrackInit; // tracking initialized? if so, attitude from IMU not used
-    void getIMUatt(double roll, double pitch);
+    void getIMUatt(cv::Mat att);
 
 private:
 

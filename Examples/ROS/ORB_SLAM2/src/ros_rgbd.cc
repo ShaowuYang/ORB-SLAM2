@@ -63,11 +63,7 @@ bool isattitudecall;
 bool isTrackInid;
 boost::mutex mAttitudelock;
 sensor_msgs::Imu attitude_data_org;
-struct myAttitude{
-    double roll;
-    double pitch;
-    double yaw;
-} attitude_data_;
+cv::Mat attitude_data_;
 
 // the world coordinates in ORB-SLAM was set to be the first frame coordinates
 cv::Mat coordinateTransform(cv::Mat mTcw)
@@ -163,17 +159,26 @@ void ImageGrabber::attitudeCallback(const sensor_msgs::ImuConstPtr& msg)
 
     btMatrix3x3 rot;
     // xsens use a ENU world coords
-    rot.setValue(1, 0, 0,
-                 0,-1, 0,
-                 0, 0, -1);
     btMatrix3x3 R(trans.getRotation());
-    R = R*rot;
     btScalar roll1, pitch1, yaw1;
     R.getEulerYPR(yaw1, pitch1, roll1);
 
-    attitude_data_.roll = roll1;
-    attitude_data_.pitch = pitch1;
-    attitude_data_.yaw = 0.0;
+    cv::Mat Rroll, Rpitch, Rw1i, Rww1, Ric, Rwi, Rwc, Rcw;
+
+    float roll[3][3] = {{1.0, 0, 0},{0, cos(roll1), -sin(roll1)},{0, sin(roll1), cos(roll1)}};
+    float pitch[3][3] = {{cos(pitch1), 0, sin(pitch1)},{0, 1.0, 0},{-sin(pitch1), 0, cos(pitch1)}};
+    Rroll  = cv::Mat(3,3,CV_32F,roll);
+    Rpitch = cv::Mat(3,3,CV_32F,pitch);
+    Rw1i = Rpitch * Rroll;
+
+    float ic[3][3] = {{-1.0, 0, 0},{0, 0, -1.0},{0, -1.0, 0}};
+    Rww1 = cv::Mat(3,3,CV_32F,ic);
+    Ric  = cv::Mat(3,3,CV_32F,ic);
+    Rwi  = Rww1*Rw1i;
+    Rwc  = Rwi*Ric;
+    Rcw  = Rwc.t();
+
+    attitude_data_ = Rcw.clone();
 
     mAttitudelock.unlock();
 
@@ -185,8 +190,9 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
   if (!isTrackInid && isattitudecall){
     mAttitudelock.lock();
     // send attitude data to tracking
-    mpSLAM->getIMUatt(attitude_data_.roll, attitude_data_.pitch);
+    mpSLAM->getIMUatt(attitude_data_);
     mAttitudelock.unlock();
+    std::cout << "sent IMU att to tracker!" << endl;
   }
 
     // Copy the ros image message to cv::Mat.

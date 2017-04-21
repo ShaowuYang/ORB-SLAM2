@@ -209,9 +209,9 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return mTcw.clone();
 }
 
-void System::getIMUatt(double roll, double pitch)
+void System::getIMUatt(cv::Mat att)
 {
-  mpTracker->getIMUatt(roll, pitch);
+  mpTracker->getIMUatt(att);
 }
 
 std::map<double, cv::Mat> System::getUpdatedKFposes()

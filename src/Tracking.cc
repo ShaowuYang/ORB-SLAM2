@@ -269,10 +269,9 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
     return mCurrentFrame.mTcw.clone();
 }
 
-void Tracking::getIMUatt(double roll, double pitch)
+void Tracking::getIMUatt(cv::Mat att)
 {
-  imuRoll = roll;
-  imuPitch= pitch;
+  imuAtt = att.clone();
   mbIMUattitude = true;
 }
 
@@ -521,32 +520,8 @@ void Tracking::Track()
 
 cv::Mat Tracking::getIniPose()
 {
-  float imu_roll, imu_pitch;
-  imu_roll = imuRoll;
-  imu_pitch= imuPitch;
-  cv::Mat Rroll, Rpitch, Rw1i, Rww1, Ric, Rwi, Rwc, Rw2w, Rw2c;
-
-  float roll[3][3] = {{1.0, 0, 0},{0, cos(imu_roll), -sin(imu_roll)},{0, sin(imu_roll), cos(imu_roll)}};
-  float pitch[3][3] = {{cos(imu_pitch), 0, sin(imu_pitch)},{0, 1.0, 0},{-sin(imu_pitch), 0, cos(imu_pitch)}};
-  Rroll  = cv::Mat(3,3,CV_32F,roll);
-  Rpitch = cv::Mat(3,3,CV_32F,pitch);
-  Rw1i = Rpitch * Rroll;
-
-  float ww1[3][3] = {{0, -1.0, 0},{1.0, 0, 0},{0, 0, 1.0}};
-  float ic[3][3] = {{-1.0, 0, 0},{0, 0, -1.0},{0, -1.0, 0}};
-  Rww1 = cv::Mat(3,3,CV_32F,ww1);
-  Ric  = cv::Mat(3,3,CV_32F,ic);
-
-  Rwi = Rww1*Rw1i;
-  Rwc = Rwi *Ric;
-
-  float w2w[3][3] = {{0, -1.0, 0},{0, 0, -1.0},{1.0, 0, 0}};
-  Rw2w = cv::Mat(3,3,CV_32F,w2w);
-
-  Rw2c = Rw2w*Rwc;
-
   cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-  Rw2c.copyTo(Tcw.rowRange(0,3).colRange(0,3));
+  imuAtt.copyTo(Tcw.rowRange(0,3).colRange(0,3));
 
   return Tcw.clone();
 }
@@ -560,7 +535,8 @@ void Tracking::StereoInitialization()
         mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
       else
       {
-        /// TODO: use imu attitude to set pose
+        /// use imu attitude to set pose
+//        mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
         mCurrentFrame.SetPose(getIniPose());
       }
 
