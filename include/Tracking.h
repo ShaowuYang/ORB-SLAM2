@@ -223,6 +223,7 @@ protected:
     /// IMU attitude
     double imuRoll, imuPitch;
     bool mbIMUattitude; // if true, use imu att to initialize the world frame
+    cv::Mat getIniPose();
 };
 
 } //namespace ORB_SLAM
