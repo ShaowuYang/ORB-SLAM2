@@ -38,6 +38,7 @@
 #include <sensor_msgs/Imu.h>
 #include "bullet/LinearMath/btTransform.h"
 
+#define PI 3.14159265
 
 using namespace std;
 
@@ -66,11 +67,12 @@ sensor_msgs::Imu attitude_data_org;
 cv::Mat attitude_data_;
 
 // the world coordinates in ORB-SLAM was set to be the first frame coordinates
+// TODO: Use RANSAC to estimate a floor
 cv::Mat coordinateTransform(cv::Mat mTcw)
 {
   // rotate to world coordinates
   float rot[3][3] = {{0,-1,0},{0,0,-1},{1,0,0}};
-  float trans[3]  = {0.,0.,0.5};
+  float trans[3]  = {0.,0.,0.}; // 0.5
   cv::Mat mR1w = cv::Mat(3,3,CV_32F,rot);
   cv::Mat mtw1 = cv::Mat(3,1,CV_32F,trans);
 
@@ -162,10 +164,12 @@ void ImageGrabber::attitudeCallback(const sensor_msgs::ImuConstPtr& msg)
     btMatrix3x3 R(trans.getRotation());
     btScalar roll1, pitch1, yaw1;
     R.getEulerYPR(yaw1, pitch1, roll1);
+//    std::cout << "IMU angle: " << roll1*180.0/3.14 << ", " << pitch1*180.0/3.14 << endl;
 
     cv::Mat Rroll, Rpitch, Rw1i, Rww1, Ric, Rwi, Rwc, Rcw;
-
-    float roll[3][3] = {{1.0, 0, 0},{0, cos(roll1), -sin(roll1)},{0, sin(roll1), cos(roll1)}};
+    float imuroll;
+    imuroll = roll1;// + 1.0/180.0*PI;
+    float roll[3][3] = {{1.0, 0, 0},{0, cos(imuroll), -sin(imuroll)},{0, sin(imuroll), cos(imuroll)}};
     float pitch[3][3] = {{cos(pitch1), 0, sin(pitch1)},{0, 1.0, 0},{-sin(pitch1), 0, cos(pitch1)}};
     Rroll  = cv::Mat(3,3,CV_32F,roll);
     Rpitch = cv::Mat(3,3,CV_32F,pitch);
@@ -186,6 +190,13 @@ void ImageGrabber::attitudeCallback(const sensor_msgs::ImuConstPtr& msg)
 
 void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD)
 {
+  // ignore first frames. XTION only provide correct images after a while
+  static int numFrame = 1;
+  if (numFrame < 100){
+    numFrame ++;
+    return;
+  }
+
   // fetch the attitude data for initialization
   if (!isTrackInid && isattitudecall){
     mAttitudelock.lock();

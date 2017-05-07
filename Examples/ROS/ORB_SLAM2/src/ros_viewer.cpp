@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 #include <eigen3/Eigen/Core>
 #include <opencv2/core/eigen.hpp>
+#include <visualization_msgs/Marker.h>
 
 #include "ros_viewer.h"
 using namespace std;
@@ -15,6 +16,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   pub_pointCloud = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloud2", 1);
   pub_pointCloudFull = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudfull2", 1);
   pub_pointCloudupdated = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudup2", 1);
+  pub_plane = nh_.advertise<visualization_msgs::Marker>("ORB_SLAM/plane", 1);
 
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
@@ -62,6 +64,8 @@ ros_viewer::ros_viewer(const string &strSettingPath)
 
   fullCloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
   mbNeedUpdateKFs = false;
+
+  firstGroundGot = false;
 }
 
 void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
@@ -98,7 +102,6 @@ void ros_viewer::updateFullPointCloud()
           // TODO: record the iterator, and erase it afterwards.
 //          updatedKFposes.erase(mit);
         }
-
     }
     // recreate point cloud
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
@@ -120,16 +123,38 @@ void ros_viewer::updateFullPointCloud()
 void ros_viewer::Run()
 {
   ros::NodeHandle nh;
+
+  groundFinder = new PlaneFinder();
+
   while(nh.ok()){
     while(rawImages_queue.size()){
+      // get each rawimage
       rawData temp = rawImages_queue[0];
 
       unique_lock<mutex> lock(mMutexROSViewer);
       rawImages_queue.erase(rawImages_queue.begin());
       lock.unlock();
 
+      // create point cloud
       pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-      cloud = createPointCloud(temp,8);
+      cloud = createPointCloud(temp,2);
+
+      // only detect the major plane in the first keyframe. Opitmization required in the future
+      // 2D grid map will be updated based on this plane and the full point cloud
+      if(!firstGroundGot){//
+        ros::Time tB = ros::Time::now();
+        firstGround = groundFinder->detectPlanesFromPointCloud(cloud);
+        ros::Duration tDetectP = ros::Time::now() - tB;
+        std::cout << "time plane detection: " << tDetectP << std::endl;
+        if (firstGround.valid){
+          viewPlane(firstGround);
+          firstGroundGot = true;
+          std::cout << "plane detected: " << firstGround.valid << ", " << firstGround.mean_[0] << ", " << firstGround.mean_[1] << ", " << firstGround.mean_[2] << std::endl;
+          std::cout << "inliers: " << firstGround.nInliers << std::endl;
+        }
+      }
+
+      // update the 2D grid map during online navigation?
 
       // publish point cloud
       if (pub_pointCloud.getNumSubscribers()){
@@ -160,7 +185,15 @@ void ros_viewer::Run()
     if (mbNeedUpdateKFs){
       updateFullPointCloud();
       mbNeedUpdateKFs = false;
+
+      // test: create 2D grid map after a loop
+
     }
+
+    // create the full 2D grid map using the major plane and the point cloud on requires
+    // if loop closed, create grid map by major plane on require
+
+    // else if no loop, create grid map with plane from each KF on require
 
     usleep(3000);
   }
@@ -259,6 +292,38 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr ros_viewer::createPointCloud(const rawDat
 //  std::cout << "time cost bTcreate interations: " << bTcreate.toSec() << std::endl;
 
   return res;
+}
+
+void ros_viewer::viewPlane(Plane pl)
+{
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = "world";
+  marker.header.stamp = ros::Time();
+  marker.ns = "planes";
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::ARROW;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.scale.x = 0.01;
+  marker.scale.y = 0.02;
+  marker.scale.z = 0.02;
+  marker.color.a = 1.0; // Don't forget to set the alpha!
+  marker.color.r = 1.0;
+  marker.color.g = 0.0;
+  marker.color.b = 0.0;
+
+  geometry_msgs::Point point;
+  point.x = pl.mean_[0];
+  point.y = pl.mean_[1];
+  point.z = pl.mean_[2];
+  marker.points.push_back(point);
+  Eigen::Vector3d end;
+  end = pl.mean_ + 0.5*pl.n;
+  point.x = end[0];
+  point.y = end[1];
+  point.z = end[2];
+  marker.points.push_back(point);
+
+  pub_plane.publish(marker);
 }
 
 } // namespace

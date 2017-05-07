@@ -72,6 +72,7 @@ ${LIBS}
 rosbuild_add_executable(RGBD
 src/ros_rgbd.cc
 src/ros_viewer.cpp
+src/plane.cpp
 )
 
 target_link_libraries(RGBD

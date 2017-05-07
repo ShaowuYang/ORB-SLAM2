@@ -9,6 +9,8 @@
 #include <iostream>
 #include <mutex>
 
+#include "plane.h"
+
 namespace My_Viewer {
 
 struct rawData{
@@ -26,6 +28,9 @@ public:
   void addUpdatedKF(const std::map<double, cv::Mat> kfposes);
   void updateFullPointCloud();
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr createPointCloud(const rawData rawimg, int step=1);
+
+  // functions for creating 2D grid map
+  void viewPlane(Plane pl);
 
   // Main function
   void Run();
@@ -51,11 +56,17 @@ private:
   ros::Publisher pub_pointCloud;
   ros::Publisher pub_pointCloudFull;
   ros::Publisher pub_pointCloudupdated;
+  ros::Publisher pub_plane;
 
   std::map<double, cv::Mat> updatedKFposes;
   bool mbNeedUpdateKFs;
 
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr fullCloud;
+
+  // plane detection
+  bool firstGroundGot;
+  Plane firstGround;
+  PlaneFinder* groundFinder;
 };
 
 } // namespace
