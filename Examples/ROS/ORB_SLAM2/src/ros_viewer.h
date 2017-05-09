@@ -8,6 +8,7 @@
 #include <nodelet/nodelet.h>
 #include <iostream>
 #include <mutex>
+#include "nav_msgs/GetMap.h"
 
 #include "plane.h"
 
@@ -31,6 +32,8 @@ public:
 
   // functions for creating 2D grid map
   void viewPlane(Plane pl);
+  void initiateGridMap();
+  void create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
 
   // Main function
   void Run();
@@ -57,6 +60,7 @@ private:
   ros::Publisher pub_pointCloudFull;
   ros::Publisher pub_pointCloudupdated;
   ros::Publisher pub_plane;
+  ros::Publisher pub_gridmap2d;
 
   std::map<double, cv::Mat> updatedKFposes;
   bool mbNeedUpdateKFs;
@@ -67,6 +71,17 @@ private:
   bool firstGroundGot;
   Plane firstGround;
   PlaneFinder* groundFinder;
+  nav_msgs::OccupancyGrid gridMap2d_;
+
+  unsigned int gridWidth, gridHeight;
+  unsigned int gridCenterx, gridCentery;
+  double gridResolution;
+  double occHeightTh;// hight threshold to be an obstacle
+  int occPointsTh;
+  int freePointsTh;
+  bool gridMapInit;
+  bool gridMapGot;
+
 };
 
 } // namespace

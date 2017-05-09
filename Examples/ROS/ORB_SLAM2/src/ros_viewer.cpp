@@ -7,6 +7,7 @@
 
 #include "ros_viewer.h"
 using namespace std;
+#define MAP_IDX(sx, i, j) ((sx) * (i) + (j))
 
 namespace My_Viewer {
 
@@ -17,6 +18,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   pub_pointCloudFull = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudfull2", 1);
   pub_pointCloudupdated = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudup2", 1);
   pub_plane = nh_.advertise<visualization_msgs::Marker>("ORB_SLAM/plane", 1);
+  pub_gridmap2d = nh_.advertise<nav_msgs::OccupancyGrid>("ORB_SLAM/gridmap", 1, true);
 
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
@@ -66,6 +68,9 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   mbNeedUpdateKFs = false;
 
   firstGroundGot = false;
+  gridMapInit = false;
+  gridMapGot = false;
+
 }
 
 void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
@@ -186,8 +191,18 @@ void ros_viewer::Run()
       updateFullPointCloud();
       mbNeedUpdateKFs = false;
 
-      // test: create 2D grid map after a loop
+      // test: create 2D grid map after a loop, TODO: in a new thread
+      if (!gridMapInit)
+        initiateGridMap();
+      if (!gridMapGot)
+        create2DgridMap(fullCloud, firstGround);
 
+    }
+
+    if (gridMapGot){
+      gridMap2d_.header.stamp = ros::Time::now();
+      gridMap2d_.header.frame_id = "world";//
+      pub_gridmap2d.publish(gridMap2d_);
     }
 
     // create the full 2D grid map using the major plane and the point cloud on requires
@@ -324,6 +339,83 @@ void ros_viewer::viewPlane(Plane pl)
   marker.points.push_back(point);
 
   pub_plane.publish(marker);
+}
+
+void ros_viewer::initiateGridMap()
+{
+  gridWidth = 400;
+  gridHeight = 400;
+  gridCenterx = 200;
+  gridCentery = 200;
+  gridResolution = 0.1;
+  occHeightTh = 0.2;
+  occPointsTh = 3;
+  freePointsTh= 3;
+  gridMapInit = true;
+
+  cout << "2D grid map initialized!" << endl;
+}
+
+void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl)
+{
+  cout << "creating 2D grid map..." << endl;
+  if(!gridMapGot) {
+    gridMap2d_.info.resolution = gridResolution;
+    gridMap2d_.info.origin.position.x = 0;//-gridWidth*gridResolution;
+    gridMap2d_.info.origin.position.y = 0;//-gridHeight*gridResolution;
+    gridMap2d_.info.origin.position.z = 0.0;
+    gridMap2d_.info.origin.orientation.x = 0.0;
+    gridMap2d_.info.origin.orientation.y = 0.0;
+    gridMap2d_.info.origin.orientation.z = 0.0;
+    gridMap2d_.info.origin.orientation.w = 1.0;
+    gridMap2d_.info.width = gridWidth;
+    gridMap2d_.info.height = gridHeight;
+    gridMap2d_.data.resize(gridMap2d_.info.width * gridMap2d_.info.height);
+  }
+
+  // project points onto the 2d grid map
+  vector<int> pointsInGrid;
+  pointsInGrid.resize(gridHeight*gridWidth, 0);
+  for(pcl::PointCloud<pcl::PointXYZRGB>::iterator pc_iter = pointcloud->begin();
+      pc_iter!=pointcloud->end();pc_iter++)
+  {
+    pcl::PointXYZRGB& pt = *pc_iter;
+    int x = int(pt.x/gridResolution) + gridCenterx;// consider grid map center
+    int y = int(pt.y/gridResolution) + gridCentery;
+    if (x >= gridWidth || x < 0 || y >= gridHeight || y < 0 ) // boundary of the grid map
+      continue;
+
+    int index = MAP_IDX(gridWidth, x, y);
+    // TODO: better justification, using plane
+    Eigen::Vector3d point(pt.x, pt.y, pt.z);
+    double z = pl.n.dot(point);
+    if ((z-pl.d) > occHeightTh)
+      pointsInGrid[index] ++;
+    else
+      pointsInGrid[index] --;
+  }
+  cout << "point cloud projected to 2d grids" << endl;
+
+  // 2d grid mapping
+  for(int x=0; x < gridHeight; x++)
+  {
+    for(int y=0; y < gridWidth; y++)
+    {
+      int occ = pointsInGrid[MAP_IDX(gridWidth, x, y)];
+      // 2d grid map has a different coord system
+      if(occ < -freePointsTh)
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = 0; // free
+      else if(occ > occPointsTh)
+      {
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = 100; // occ
+      }
+      else
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = -1; // unknown
+    }
+  }
+
+  gridMapGot = true;
+  cout << "2D grid map created!" << endl;
 }
 
 } // namespace
