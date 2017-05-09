@@ -361,8 +361,8 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
   cout << "creating 2D grid map..." << endl;
   if(!gridMapGot) {
     gridMap2d_.info.resolution = gridResolution;
-    gridMap2d_.info.origin.position.x = 0;//-gridWidth*gridResolution;
-    gridMap2d_.info.origin.position.y = 0;//-gridHeight*gridResolution;
+    gridMap2d_.info.origin.position.x = -0.5*gridWidth*gridResolution;
+    gridMap2d_.info.origin.position.y = -0.5*gridHeight*gridResolution;
     gridMap2d_.info.origin.position.z = 0.0;
     gridMap2d_.info.origin.orientation.x = 0.0;
     gridMap2d_.info.origin.orientation.y = 0.0;
@@ -380,8 +380,8 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
       pc_iter!=pointcloud->end();pc_iter++)
   {
     pcl::PointXYZRGB& pt = *pc_iter;
-    int x = int(pt.x/gridResolution) + gridCenterx;// consider grid map center
-    int y = int(pt.y/gridResolution) + gridCentery;
+    int x = (pt.x-gridMap2d_.info.origin.position.x)/gridResolution;// consider grid map center
+    int y = (pt.y-gridMap2d_.info.origin.position.y)/gridResolution;
     if (x >= gridWidth || x < 0 || y >= gridHeight || y < 0 ) // boundary of the grid map
       continue;
 
