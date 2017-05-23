@@ -18,7 +18,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   pub_pointCloudFull = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudfull2", 1);
   pub_pointCloudupdated = nh_.advertise<sensor_msgs::PointCloud2>("ORB_SLAM/pointcloudup2", 1);
   pub_plane = nh_.advertise<visualization_msgs::Marker>("ORB_SLAM/plane", 1);
-  pub_gridmap2d = nh_.advertise<nav_msgs::OccupancyGrid>("ORB_SLAM/gridmap", 1, true);
+  pub_gridmap2d = nh_.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
 
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
@@ -70,7 +70,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   firstGroundGot = false;
   gridMapInit = false;
   gridMapGot = false;
-
+  gridMappingRequired = false;
 }
 
 void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
@@ -119,7 +119,7 @@ void ros_viewer::updateFullPointCloud()
   if (pub_pointCloudupdated.getNumSubscribers()){
     sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
     pcl::toROSMsg(*fullCloud, *msgf);
-    msgf->header.frame_id = "world";//
+    msgf->header.frame_id = "map";//
     msgf->header.stamp = ros::Time(rawImages[rawImages.size()-1].timestamp);
     pub_pointCloudupdated.publish(msgf);
   }
@@ -159,13 +159,16 @@ void ros_viewer::Run()
         }
       }
 
-      // update the 2D grid map during online navigation?
+      // update the 2D grid map during online navigation / localization mode, after grid map is got
+      if (gridMapGot){
+        update2DgridMap(cloud, firstGround);
+      }
 
       // publish point cloud
       if (pub_pointCloud.getNumSubscribers()){
         sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2());
         pcl::toROSMsg(*cloud, *msg);
-        msg->header.frame_id = "world";//
+        msg->header.frame_id = "map";//
         msg->header.stamp = ros::Time(temp.timestamp);
 
         pub_pointCloud.publish(msg);
@@ -180,7 +183,7 @@ void ros_viewer::Run()
         sensor_msgs::PointCloud2Ptr msgf(new sensor_msgs::PointCloud2());
         pcl::toROSMsg(*fullCloud, *msgf);
         nfullcloud++;
-        msgf->header.frame_id = "world";//
+        msgf->header.frame_id = "map";//
         msgf->header.stamp = ros::Time(temp.timestamp);
         pub_pointCloudFull.publish(msgf);
       }
@@ -199,16 +202,27 @@ void ros_viewer::Run()
 
     }
 
-    if (gridMapGot){
-      gridMap2d_.header.stamp = ros::Time::now();
-      gridMap2d_.header.frame_id = "world";//
-      pub_gridmap2d.publish(gridMap2d_);
+    // publish grid map to other nodes
+    if (gridMapGot && pub_gridmap2d.getNumSubscribers()){
+      static int num = 0;
+      num ++;
+      if (num == 40){
+        gridMap2d_.header.stamp = ros::Time::now();
+        gridMap2d_.header.frame_id = "map";//
+        pub_gridmap2d.publish(gridMap2d_);
+
+        num = 0;
+      }
     }
 
-    // create the full 2D grid map using the major plane and the point cloud on requires
+    // create the full 2D grid map using the major plane and the point cloud on requires:
     // if loop closed, create grid map by major plane on require
 
     // else if no loop, create grid map with plane from each KF on require
+    if (gridMappingRequired){
+      create2DgridMapOnRequire(fullCloud, firstGround);
+      gridMappingRequired = false;
+    }
 
     usleep(3000);
   }
@@ -312,7 +326,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr ros_viewer::createPointCloud(const rawDat
 void ros_viewer::viewPlane(Plane pl)
 {
   visualization_msgs::Marker marker;
-  marker.header.frame_id = "world";
+  marker.header.frame_id = "map";
   marker.header.stamp = ros::Time();
   marker.ns = "planes";
   marker.id = 0;
@@ -404,13 +418,13 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
       int occ = pointsInGrid[MAP_IDX(gridWidth, x, y)];
       // 2d grid map has a different coord system
       if(occ < -freePointsTh)
-        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = 0; // free
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = FREE; // free
       else if(occ > occPointsTh)
       {
-        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = 100; // occ
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = OCCUPY; // occ
       }
       else
-        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = -1; // unknown
+        gridMap2d_.data[MAP_IDX(gridWidth, y, x)] = UNKNOWN; // unknown
     }
   }
 
@@ -418,4 +432,17 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
   cout << "2D grid map created!" << endl;
 }
 
+void ros_viewer::create2DgridMapOnRequire(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl)
+{
+  // for each kf, update the grid map using the current ground plane
+
+  gridMapGot = true;
+}
+
+void ros_viewer::update2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl)
+{
+  // update the grid map using the pointcloud from the current kf and the major ground plane
+
+  gridMapGot = true;
+}
 } // namespace

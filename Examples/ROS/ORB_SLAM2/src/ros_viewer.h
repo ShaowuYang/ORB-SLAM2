@@ -21,6 +21,13 @@ struct rawData{
   double timestamp;
 };
 
+enum gridData{
+  UNKNOWN=-1,
+  FREE=0,
+  OCCUPY=100,
+  HOLE=-100
+};
+
 class ros_viewer
 {
 public:
@@ -34,6 +41,8 @@ public:
   void viewPlane(Plane pl);
   void initiateGridMap();
   void create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
+  void create2DgridMapOnRequire(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
+  void update2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
 
   // Main function
   void Run();
@@ -81,6 +90,7 @@ private:
   int freePointsTh;
   bool gridMapInit;
   bool gridMapGot;
+  bool gridMappingRequired;
 
 };
 

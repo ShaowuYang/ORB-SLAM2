@@ -97,19 +97,26 @@ int main(int argc, char **argv)
     if(argc != 3)
     {
         cerr << endl << "Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" << endl;
-        ros::shutdown();
-        return 1;
+//        ros::shutdown();
+//        return 1;
     }
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
+    ros::NodeHandle nh;
+    ros::NodeHandle nh_private_  = ros::NodeHandle("~");
+
+    string argv1, argv2;
+    if (!nh_private_.getParam("strVocFile", argv1))
+      argv1 = argv[1];
+    if (!nh_private_.getParam("strSettingsFile", argv2))
+      argv2 = argv[2];
+    ORB_SLAM2::System SLAM(argv1,argv2,ORB_SLAM2::System::RGBD,true);
 
     ImageGrabber igb(&SLAM);
 
-    ros::NodeHandle nh;
 
     /// setup ros viewer, a new thread
-    ros_view = new My_Viewer::ros_viewer(argv[2]);
+    ros_view = new My_Viewer::ros_viewer(argv2);
     mptViewer = new thread(&My_Viewer::ros_viewer::Run,ros_view);
 
     tfb_ = new tf::TransformBroadcaster();
@@ -266,7 +273,7 @@ void ImageGrabber::pub_camera(const cv::Mat mTcw1)
                              position);
   tf::StampedTransform tf_stamped(camtf.inverse(),
                                       ros::Time::now(),
-                                      "world", "camera_link");
+                                      "map", "base_link");
   tfb_->sendTransform(tf_stamped);
 
 }
