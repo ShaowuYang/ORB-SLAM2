@@ -43,6 +43,7 @@ public:
   void create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
   void create2DgridMapOnRequire(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
   void update2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl);
+  void goalCB(const geometry_msgs::PoseStamped::ConstPtr& goal);
 
   // Main function
   void Run();
@@ -70,6 +71,7 @@ private:
   ros::Publisher pub_pointCloudupdated;
   ros::Publisher pub_plane;
   ros::Publisher pub_gridmap2d;
+  ros::Subscriber goal_sub_;
 
   std::map<double, cv::Mat> updatedKFposes;
   bool mbNeedUpdateKFs;
@@ -91,6 +93,7 @@ private:
   bool gridMapInit;
   bool gridMapGot;
   bool gridMappingRequired;
+  bool gridMappedByRequire;
 
 };
 

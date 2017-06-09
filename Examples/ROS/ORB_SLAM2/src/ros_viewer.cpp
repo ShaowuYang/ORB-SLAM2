@@ -20,6 +20,8 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   pub_plane = nh_.advertise<visualization_msgs::Marker>("ORB_SLAM/plane", 1);
   pub_gridmap2d = nh_.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
 
+  goal_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("move_base_simple/goal", 1, boost::bind(&ros_viewer::goalCB, this, _1));
+
   //Check settings file
   cv::FileStorage fSettings(strSettingPath.c_str(), cv::FileStorage::READ);
   if(!fSettings.isOpened())
@@ -71,6 +73,7 @@ ros_viewer::ros_viewer(const string &strSettingPath)
   gridMapInit = false;
   gridMapGot = false;
   gridMappingRequired = false;
+  gridMappedByRequire = false;
 }
 
 void ros_viewer::addKfToQueue(const cv::Mat im, const cv::Mat depthmap, const double timestamp, const cv::Mat mTcw)
@@ -220,7 +223,9 @@ void ros_viewer::Run()
 
     // else if no loop, create grid map with plane from each KF on require
     if (gridMappingRequired){
-      create2DgridMapOnRequire(fullCloud, firstGround);
+      if (!gridMapInit)
+        initiateGridMap();
+      create2DgridMap(fullCloud, firstGround);//OnRequire
       gridMappingRequired = false;
     }
 
@@ -372,7 +377,7 @@ void ros_viewer::initiateGridMap()
 
 void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl)
 {
-  cout << "creating 2D grid map..." << endl;
+  ROS_INFO("creating 2D grid map..." );
   if(!gridMapGot) {
     gridMap2d_.info.resolution = gridResolution;
     gridMap2d_.info.origin.position.x = -0.5*gridWidth*gridResolution;
@@ -408,7 +413,7 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
     else
       pointsInGrid[index] --;
   }
-  cout << "point cloud projected to 2d grids" << endl;
+  ROS_INFO("point cloud projected to 2d grids");
 
   // 2d grid mapping
   for(int x=0; x < gridHeight; x++)
@@ -429,7 +434,7 @@ void ros_viewer::create2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
   }
 
   gridMapGot = true;
-  cout << "2D grid map created!" << endl;
+  ROS_INFO("2D grid map created!");
 }
 
 void ros_viewer::create2DgridMapOnRequire(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointcloud, Plane pl)
@@ -445,4 +450,15 @@ void ros_viewer::update2DgridMap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointclo
 
   gridMapGot = true;
 }
+
+void ros_viewer::goalCB(const geometry_msgs::PoseStamped::ConstPtr& goal)
+{
+  if (!gridMappedByRequire){ // grid map on require for only once.
+    gridMappingRequired = true;
+    gridMappedByRequire = true;
+
+    ROS_INFO("2D grid mapping on require!");
+  }
+}
+
 } // namespace
